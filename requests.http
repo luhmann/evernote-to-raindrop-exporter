@@ -1,0 +1,127 @@
+# RAINDROPS
+@RAINDROPS_TOKEN={{$dotenv RAINDROPS_TOKEN}}
+@RAINDROP_API_URL=https://api.raindrop.io/rest/v1
+
+### Get all tags
+GET {{RAINDROP_API_URL}}/tags
+Authorization: Bearer {{RAINDROPS_TOKEN}}
+
+### Get all collections
+GET {{RAINDROP_API_URL}}/collections
+Authorization: Bearer {{RAINDROPS_TOKEN}}
+
+### Create collection
+POST {{RAINDROP_API_URL}}/collection
+Content-Type: application/json
+Authorization: Bearer {{RAINDROPS_TOKEN}}
+
+{
+  "title": "Test"
+}
+
+### Delete generated collections
+DELETE {{RAINDROP_API_URL}}/collections
+Content-Type: application/json
+Authorization: Bearer {{RAINDROPS_TOKEN}}
+
+{
+  "ids": [
+    15696023,
+    15696022,
+    15696021,
+    15696020,
+    15696019,
+    15695690
+  ]
+}
+
+### Get single raindrop
+#GET {{RAINDROP_API_URL}}/raindrop/226491420
+GET {{RAINDROP_API_URL}}/raindrop/227206581
+Authorization: Bearer {{RAINDROPS_TOKEN}}
+
+### Get raindrops
+GET {{RAINDROP_API_URL}}/raindrops/15556187
+Authorization: Bearer {{RAINDROPS_TOKEN}}
+
+### Create single raindrop
+# ref: https://developer.raindrop.io/v1/raindrops/single
+POST {{RAINDROP_API_URL}}/raindrop
+Authorization: Bearer {{RAINDROPS_TOKEN}}
+Content-Type: application/json
+
+{
+  "link": "https://javascript.info/ninja-code",
+  "collectionId": "15556704",
+  "created": "2020-08-22T07:25:12.000Z",
+  "tags": ["codestyle", "lessons learned"],
+  "excerpt": "...when discussing why writing code in a very complex way is not a good idea",
+  "pleaseParse": {}
+}
+
+### Create multiple raindrop
+# ref: https://developer.raindrop.io/v1/raindrops/multiple
+POST {{RAINDROP_API_URL}}/raindrops
+Authorization: Bearer {{RAINDROPS_TOKEN}}
+Content-Type: application/json
+
+{
+  "items": [
+    {
+      "link": "https://javascript.info/ninja-code",
+      "collectionId": "15556704",
+      "created": "2020-08-22T07:25:12.000Z",
+      "tags": ["codestyle", "lessons learned"],
+      "excerpt": "...when discussing why writing code in a very complex way is not a good idea",
+      "pleaseParse": {}
+    }
+  ]
+}
+
+### Delete single raindrop
+DELETE {{RAINDROP_API_URL}}/raindrop/227482779
+Authorization: Bearer {{RAINDROPS_TOKEN}}
+Content-Type: application/json
+
+
+### Delete raindrops
+# ref: https://developer.raindrop.io/v1/raindrops/multiple#remove-many-raindrops
+DELETE {{RAINDROP_API_URL}}/raindrops
+Authorization: Bearer {{RAINDROPS_TOKEN}}
+Content-Type: application/json
+
+{
+  "ids": [
+    227482779,
+    227482780,
+    227482781,
+    227482782,
+    227482783,
+    227482784,
+    227482785,
+    227482786,
+    227482787,
+    227482788,
+    227482789,
+    227482790,
+    227482791,
+    227482792,
+    227482793,
+    227482794,
+    227482795,
+    227482796,
+    227482797,
+    227482798,
+    227482799,
+    227482800,
+    227482801,
+    227482802,
+    227482803
+  ]
+}
+
+### Empty trash
+# ref: https://developer.raindrop.io/v1/raindrops/multiple#remove-many-raindrops
+DELETE {{RAINDROP_API_URL}}/raindrops/-99
+Authorization: Bearer {{RAINDROPS_TOKEN}}
+Content-Type: application/json
