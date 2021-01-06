@@ -74,12 +74,15 @@ const setupLogOutput = () => {
         "----------------------------------------------------------------"
       );
       log.info(`Created ${created.length} raindrops.`);
-      console.log(created.map((raindrop) => raindrop._id));
+      log.debug(
+        "Created raindrop ids",
+        created.map((raindrop) => raindrop._id)
+      );
     });
 
   importFailureMessages$.subscribe((failure: ImportFailure) => {
     log.warn(
-      `Note with title "${failure.note.title}" from notebook "${failure.note.notebook}"could not be imported. Reason: ${failure.reason}`
+      `Note with title "${failure.note.title}" from notebook "${failure.note.notebook}" could not be imported. Reason: ${failure.reason}`
     );
   });
 
@@ -90,11 +93,11 @@ const setupLogOutput = () => {
         "----------------------------------------------------------------"
       );
       log.warn(
-        `Could not import ${failures.length} notes. This usually means that they have no url set, if you think this is a mistake you can check the notes directly in Evernote with the links below`
+        `Could not import ${failures.length} notes. This usually means that they have no url set, if you think this is a mistake you can check the notes directly in Evernote with the provided links.`
       );
       console.log(
         failures.map((failure) => [
-          failure.note.title,
+          `Title: ${failure.note.title}`,
           getEvernoteWebLink(failure.note.notebookId, failure.note.id) ??
             failure.note.notebookId,
         ])
@@ -128,8 +131,9 @@ const createMissingEvernoteNotebooksAsCollections = (
       );
 
       log.info(
-        "The following collections do not exist in raindrop.io and will be created",
-        missingCollections
+        `The following collections do not exist in raindrop.io and will be created: "${missingCollections.join(
+          ", "
+        )}"`
       );
 
       return missingCollections;
