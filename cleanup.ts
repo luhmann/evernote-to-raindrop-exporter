@@ -53,3 +53,5 @@ deleteRaindrops$
     concatMap(() => deleteCollections$)
   )
   .subscribe();
+
+// TODO: just deleting collections is enough, notes will be moved to trash

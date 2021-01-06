@@ -18,7 +18,8 @@ import {
   tap,
 } from "rxjs/operators";
 import type { Required } from "utility-types";
-import { importNotes } from "./lib/evernote";
+import { getImportConfig } from "./lib/cli";
+import { importNotes, TargetedNotebooks } from "./lib/evernote";
 import { log } from "./lib/logger";
 import {
   batchCreateRaindrops,
@@ -88,7 +89,9 @@ const setupLogOutput = () => {
       console.log(
         "----------------------------------------------------------------"
       );
-      log.warn(`Could not import ${failures.length} notes`);
+      log.warn(
+        `Could not import ${failures.length} notes. This usually means that they have no url set, if you think this is a mistake you can check the notes directly in Evernote with the links below`
+      );
       console.log(
         failures.map((failure) => [
           failure.note.title,
@@ -151,7 +154,7 @@ const createMissingEvernoteNotebooksAsCollections = (
     }),
     switchMap(() => getAllCollections()),
     map((collections) => {
-      const collectionsMap = new Map();
+      const collectionsMap = new Map<string, number>();
       for (const collection of collections) {
         collectionsMap.set(collection.title, collection._id);
       }
@@ -164,23 +167,15 @@ const createMissingEvernoteNotebooksAsCollections = (
   return { collections$ };
 };
 
-(async function () {
-  const { importSuccess$, importFailures$ } = setupLogOutput();
-
-  const evernoteNotes$ = importNotes({
-    // stacks: [config?.EVERNOTE_STACK_TO_EXPORT as string],
-    names: ["2020:Articles"],
-  }).pipe(map(filterInvalidNotes(importFailures$)), share());
-
-  const { collections$ } = createMissingEvernoteNotebooksAsCollections(
-    evernoteNotes$
-  );
-
+const createRaindrops = (
+  collections$: Observable<Map<string, number>>,
+  evernoteNotes$: Observable<Required<Link, "uri">[]>
+) => {
   const import$ = combineLatest([collections$, evernoteNotes$]).pipe(
     tap(([, notes]) => log.info(`Importing ${notes.length} Notes`)),
     map(([collectionsMap, notes]): Raindrop[] =>
       notes.map((note) => ({
-        collectionId: collectionsMap.get(note.notebook),
+        collectionId: collectionsMap.get(note.notebook) as number,
         created: convertDateToIso(note.created),
         link: note.uri,
         title: note.title,
@@ -202,6 +197,34 @@ const createMissingEvernoteNotebooksAsCollections = (
     tap(() => log.debug("Successfully created chunk of notes")),
     share()
   );
+
+  return { import$ };
+};
+
+(async function () {
+  const selection = await getImportConfig();
+
+  log.debug("Import-Selection:", selection);
+
+  const targetedNotebooks: TargetedNotebooks = {
+    ...(selection.target === "names" ? { names: selection.selectedNames } : {}),
+    ...(selection.target === "stacks"
+      ? { stacks: selection.selectedStacks }
+      : {}),
+  };
+
+  const { importSuccess$, importFailures$ } = setupLogOutput();
+
+  const evernoteNotes$ = importNotes(targetedNotebooks).pipe(
+    map(filterInvalidNotes(importFailures$)),
+    share()
+  );
+
+  const { collections$ } = createMissingEvernoteNotebooksAsCollections(
+    evernoteNotes$
+  );
+
+  const { import$ } = createRaindrops(collections$, evernoteNotes$);
 
   import$.subscribe(
     (notes) => {

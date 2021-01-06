@@ -35,8 +35,25 @@ const notebookDataToLoad = new evernote.NoteStore.NotesMetadataResultSpec({
   includeLargestResourceSize: false,
 });
 
-const getNotebookList = (): Promise<evernote.Types.Notebook[]> =>
+export const getNotebookList = (): Promise<evernote.Types.Notebook[]> =>
   noteStore.listNotebooks();
+
+export const getAllNotebooksAndStacks = async () => {
+  const notebooks = await getNotebookList();
+
+  return {
+    names: notebooks
+      .map((notebook) => notebook.name)
+      .filter((item): item is string => Boolean(item)),
+    stacks: [
+      ...new Set([
+        ...notebooks
+          .map((notebook) => notebook.stack)
+          .filter((item): item is string => Boolean(item)),
+      ]),
+    ],
+  };
+};
 
 export type TargetedNotebooks = {
   stacks?: string[];
