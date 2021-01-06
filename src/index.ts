@@ -1,17 +1,24 @@
-import { combineLatest, forkJoin, of, ReplaySubject, Subject } from "rxjs";
+import {
+  combineLatest,
+  forkJoin,
+  Observable,
+  of,
+  ReplaySubject,
+  Subject,
+} from "rxjs";
 import {
   bufferCount,
   catchError,
   concatMap,
   delay,
-  last,
   map,
   reduce,
   share,
   switchMap,
   tap,
 } from "rxjs/operators";
-import { EvernoteNote, importNotes } from "./lib/evernote";
+import type { Required } from "utility-types";
+import { importNotes } from "./lib/evernote";
 import { log } from "./lib/logger";
 import {
   batchCreateRaindrops,
@@ -20,22 +27,22 @@ import {
   mapCollections,
   Raindrop,
 } from "./lib/raindrops";
-import { convertDateToIso, getEvernoteWebLink } from "./lib/util";
+import { convertDateToIso, getEvernoteWebLink, Link } from "./lib/util";
 
 enum ImportFailureReason {
   NO_LINK = "Note is missing URI, currently only links are supported by this script",
 }
 
 type ImportFailure = {
-  note: EvernoteNote;
+  note: Link;
   reason: ImportFailureReason;
 };
 
 const filterInvalidNotes = (importFailures$: Subject<ImportFailure>) => (
-  notes: EvernoteNote[]
-) =>
-  notes.filter((note) => {
-    const shouldInclude = note.link !== null;
+  notes: Link[]
+): Required<Link, "uri">[] =>
+  notes.filter((note): note is Required<Link, "uri"> => {
+    const shouldInclude = Boolean(note.uri);
 
     if (!shouldInclude) {
       importFailures$.next({ note, reason: ImportFailureReason.NO_LINK });
@@ -44,25 +51,68 @@ const filterInvalidNotes = (importFailures$: Subject<ImportFailure>) => (
     return shouldInclude;
   });
 
-(async function () {
+const setupLogOutput = () => {
   const importFailures$ = new ReplaySubject<ImportFailure>();
   const importSuccess$ = new ReplaySubject<Raindrop[]>();
 
-  const evernoteNotes$ = importNotes({
-    // stacks: [config?.EVERNOTE_STACK_TO_EXPORT as string],
-    names: ["2020:Articles"],
-  }).pipe(map(filterInvalidNotes(importFailures$)), share());
+  const importSuccessMessages$ = importSuccess$.pipe(
+    concatMap((x) => x),
+    share()
+  );
 
+  const importFailureMessages$ = importFailures$.pipe(share());
+
+  importSuccessMessages$.subscribe((note) => {
+    log.debug(`Created raindrop "${note.title}" -- id "${note._id}"`);
+  });
+
+  importSuccessMessages$
+    .pipe(reduce((acc, item) => [...acc, item], [] as Raindrop[]))
+    .subscribe((created) => {
+      console.log(
+        "----------------------------------------------------------------"
+      );
+      log.info(`Created ${created.length} raindrops.`);
+      console.log(created.map((raindrop) => raindrop._id));
+    });
+
+  importFailureMessages$.subscribe((failure: ImportFailure) => {
+    log.warn(
+      `Note with title "${failure.note.title}" from notebook "${failure.note.notebook}"could not be imported. Reason: ${failure.reason}`
+    );
+  });
+
+  importFailureMessages$
+    .pipe(reduce((acc, item) => [...acc, item], [] as ImportFailure[]))
+    .subscribe((failures) => {
+      console.log(
+        "----------------------------------------------------------------"
+      );
+      log.warn(`Could not import ${failures.length} notes`);
+      console.log(
+        failures.map((failure) => [
+          failure.note.title,
+          getEvernoteWebLink(failure.note.notebookId, failure.note.id) ??
+            failure.note.notebookId,
+        ])
+      );
+    });
+
+  return { importSuccess$, importFailures$ };
+};
+
+const createMissingEvernoteNotebooksAsCollections = (
+  evernoteNotes$: Observable<Link[]>
+) => {
   const existingCollections$ = getAllCollections().pipe(map(mapCollections));
-
   const requiredCollections$ = evernoteNotes$.pipe(
     map(
-      (notes: EvernoteNote[]) =>
+      (notes: Link[]) =>
         new Set([...notes.map((note) => note.notebook)].filter(Boolean))
     )
   );
 
-  const collectionsReady$ = combineLatest([
+  const collections$ = combineLatest([
     existingCollections$,
     requiredCollections$,
   ]).pipe(
@@ -111,14 +161,28 @@ const filterInvalidNotes = (importFailures$: Subject<ImportFailure>) => (
     share()
   );
 
-  const import$ = combineLatest([collectionsReady$, evernoteNotes$]).pipe(
+  return { collections$ };
+};
+
+(async function () {
+  const { importSuccess$, importFailures$ } = setupLogOutput();
+
+  const evernoteNotes$ = importNotes({
+    // stacks: [config?.EVERNOTE_STACK_TO_EXPORT as string],
+    names: ["2020:Articles"],
+  }).pipe(map(filterInvalidNotes(importFailures$)), share());
+
+  const { collections$ } = createMissingEvernoteNotebooksAsCollections(
+    evernoteNotes$
+  );
+
+  const import$ = combineLatest([collections$, evernoteNotes$]).pipe(
     tap(([, notes]) => log.info(`Importing ${notes.length} Notes`)),
-    map(([collectionsMap, notes]) =>
-      notes.map((note: EvernoteNote) => ({
-        // TODO: get rid off typecasts (undefined is filtered before, cannot be inferred)
+    map(([collectionsMap, notes]): Raindrop[] =>
+      notes.map((note) => ({
         collectionId: collectionsMap.get(note.notebook),
-        created: convertDateToIso(note.created as number),
-        link: note.link as string,
+        created: convertDateToIso(note.created),
+        link: note.uri,
         title: note.title,
         ...(!!note.tags?.length ? { tags: note.tags } : {}),
       }))
@@ -150,47 +214,4 @@ const filterInvalidNotes = (importFailures$: Subject<ImportFailure>) => (
       importFailures$.complete();
     }
   );
-
-  const importSuccessMessages$ = importSuccess$.pipe(
-    concatMap((x) => x),
-    share()
-  );
-
-  const importFailureMessages$ = importFailures$.pipe(share());
-
-  importSuccessMessages$.subscribe((note) => {
-    log.debug(`Created raindrop "${note.title}" -- id "${note._id}"`);
-  });
-
-  importSuccessMessages$
-    .pipe(reduce((acc, item) => [...acc, item], [] as Raindrop[]))
-    .subscribe((created) => {
-      console.log(
-        "----------------------------------------------------------------"
-      );
-      log.info(`Created ${created.length} raindrops.`);
-      console.log(created.map((raindrop) => raindrop._id));
-    });
-
-  importFailureMessages$.subscribe((failure: ImportFailure) => {
-    log.warn(
-      `Note with title "${failure.note.title}" from notebook "${failure.note.notebook}"could not be imported. Reason: ${failure.reason}`
-    );
-  });
-
-  importFailureMessages$
-    .pipe(reduce((acc, item) => [...acc, item], [] as ImportFailure[]))
-    .subscribe((failures) => {
-      console.log(
-        "----------------------------------------------------------------"
-      );
-      log.warn(`Could not import ${failures.length} notes`);
-      console.log(
-        failures.map((failure) => [
-          failure.note.title,
-          getEvernoteWebLink(failure.note.notebookGuid, failure.note.guid) ??
-            failure.note.guid,
-        ])
-      );
-    });
 })();

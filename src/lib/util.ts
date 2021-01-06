@@ -6,12 +6,14 @@ export const convertDateToIso = (datetime?: number): string | undefined => {
 };
 
 export type Link = {
-  link: string;
+  id?: string;
+  uri?: string;
   notebook: string;
+  notebookId?: string;
   title?: string;
   created?: number;
   tags?: string[];
-  excerpt?: string;
+  description?: string;
 };
 
 export const getEvernoteWebLink = (notebook?: string, note?: string) =>

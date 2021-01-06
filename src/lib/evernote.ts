@@ -13,6 +13,7 @@ import {
 } from "rxjs/operators";
 import { config } from "./config";
 import { log } from "./logger";
+import { Link } from "./util";
 
 const client = new evernote.Client({
   token: config?.EVERNOTE_AUTH_TOKEN,
@@ -67,27 +68,25 @@ const filterRelevantNotebooks = ({ stacks, names }: TargetedNotebooks) => (
   return filteredNotebooks;
 };
 
-export type EvernoteNote = Pick<
-  evernote.NoteStore.NoteMetadata,
-  "guid" | "title" | "created" | "notebookGuid"
-> & {
-  link: evernote.Types.NoteAttributes["sourceURL"];
-  notebook: evernote.Types.Notebook["name"];
-  tags: evernote.NoteStore.NoteMetadata["tagGuids"];
-};
-
 const getRelevantNoteData = (
   note: evernote.NoteStore.NoteMetadata,
   notebookName: evernote.Types.Notebook["name"]
-) => ({
-  guid: note.guid,
-  title: note.title,
-  created: note.created,
-  notebook: notebookName,
-  notebookGuid: note.notebookGuid,
-  tags: note.tagGuids,
-  link: note.attributes?.sourceURL,
-});
+): Link => {
+  if (!notebookName) {
+    throw new Error(
+      "Could not map evernote-note to generic note-type: Notebook Name missing"
+    );
+  }
+  return {
+    id: note.guid,
+    title: note.title,
+    created: note.created,
+    notebook: notebookName,
+    notebookId: note.notebookGuid,
+    tags: note.tagGuids,
+    uri: note.attributes?.sourceURL,
+  };
+};
 
 /**
  * `findNoteMeta` from Evernote SDK will not return more than 250 notes per request.
@@ -114,7 +113,7 @@ const getRangeOfNotesFromNotebook = (
 
 const getNotesFromNotebook = (
   notebook: evernote.Types.Notebook
-): Observable<EvernoteNote[]> => {
+): Observable<Link[]> => {
   return from(
     getRangeOfNotesFromNotebook(notebook, 0, MAXIMUM_BATCH_SIZE)
   ).pipe(
@@ -167,7 +166,7 @@ const getTagName = async (id: string) => {
   return tag.name?.toLowerCase();
 };
 
-const expandTagNamesOnNotes = (notes: EvernoteNote[]) =>
+const expandTagNamesOnNotes = (notes: Link[]) =>
   notes.map(async (note) => {
     const tagsWithNames = await (note.tags && note.tags.length > 0
       ? Promise.all(note.tags.map(getTagName))
@@ -180,7 +179,7 @@ const expandTagNamesOnNotes = (notes: EvernoteNote[]) =>
   });
 
 export function importNotes(targetedNotebooks: TargetedNotebooks) {
-  const notes: Observable<EvernoteNote[]> = from(getNotebookList()).pipe(
+  const notes: Observable<Link[]> = from(getNotebookList()).pipe(
     map(filterRelevantNotebooks(targetedNotebooks)),
     tap((notebooks) => {
       const notebookNames = notebooks
