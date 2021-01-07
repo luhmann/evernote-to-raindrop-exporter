@@ -1,6 +1,7 @@
 import {
   combineLatest,
   forkJoin,
+  from,
   Observable,
   of,
   ReplaySubject,
@@ -15,10 +16,12 @@ import {
   reduce,
   share,
   switchMap,
+  take,
   tap,
 } from "rxjs/operators";
+import { difference } from "remeda";
 import type { Required } from "utility-types";
-import { getImportConfig } from "./lib/cli";
+import { confirmImport, getImportConfig } from "./lib/cli";
 import { importNotes, TargetedNotebooks } from "./lib/evernote";
 import { log } from "./lib/logger";
 import {
@@ -70,7 +73,7 @@ const setupLogOutput = () => {
   importSuccessMessages$
     .pipe(reduce((acc, item) => [...acc, item], [] as Raindrop[]))
     .subscribe((created) => {
-      console.log(
+      log.debug(
         "----------------------------------------------------------------"
       );
       log.info(`Created ${created.length} raindrops.`);
@@ -89,11 +92,11 @@ const setupLogOutput = () => {
   importFailureMessages$
     .pipe(reduce((acc, item) => [...acc, item], [] as ImportFailure[]))
     .subscribe((failures) => {
-      console.log(
+      log.debug(
         "----------------------------------------------------------------"
       );
       log.warn(
-        `Could not import ${failures.length} notes. This usually means that they have no url set, if you think this is a mistake you can check the notes directly in Evernote with the provided links.`
+        `Could not import ${failures.length} notes. This usually means that they have no url set. If you think this is a mistake you can check the notes directly in Evernote with the provided links.`
       );
       console.log(
         failures.map((failure) => [
@@ -122,39 +125,64 @@ const createMissingEvernoteNotebooksAsCollections = (
     existingCollections$,
     requiredCollections$,
   ]).pipe(
+    switchMap((collections) =>
+      from(confirmImport()).pipe(
+        take(1),
+        map((answer) => {
+          if (answer.confirmStart === false) {
+            process.exit(1);
+          }
+
+          return collections;
+        })
+      )
+    ),
     map(([existingCollections, requiredCollections]) => {
       const existingNames = existingCollections.map(
         (collection) => collection.name
       );
-      const missingCollections = [...requiredCollections].filter(
-        (collection) => !existingNames.includes(collection as string)
+      const missingCollections = difference(
+        [...requiredCollections],
+        existingNames
       );
 
-      log.info(
-        `The following collections do not exist in raindrop.io and will be created: "${missingCollections.join(
-          ", "
-        )}"`
-      );
+      if (missingCollections.length > 0) {
+        log.info(
+          `The following collections do not exist in raindrop.io and will be created: "${missingCollections.join(
+            ", "
+          )}"`
+        );
+      } else {
+        log.info(
+          "All notebooks in Evernote have matching collections in raindrops.io"
+        );
+      }
 
       return missingCollections;
     }),
-    switchMap((collections) =>
-      forkJoin(
-        collections.map((collection) => {
-          log.info(`Creating collection "${collection}" on raindrop.io`);
-          return createCollection(collection as string);
-        })
-      )
-    ),
+    switchMap((collections) => {
+      if (collections.length > 0) {
+        return forkJoin(
+          collections.map((collection) => {
+            log.info(`Creating collection "${collection}" on raindrop.io`);
+            return createCollection(collection as string);
+          })
+        );
+      } else {
+        return of([]);
+      }
+    }),
     tap((collections) => {
       for (const collection of collections) {
         log.info(
           `Successfully created collection "${collection.title}" with id "${collection._id}"`
         );
       }
-      log.debug(
-        `Created collection-ids "${collections.map((col) => col._id)}"`
-      );
+      if (collections.length > 0) {
+        log.debug(
+          `Created collection-ids "${collections.map((col) => col._id)}"`
+        );
+      }
     }),
     switchMap(() => getAllCollections()),
     map((collections) => {
@@ -175,7 +203,10 @@ const createRaindrops = (
   collections$: Observable<Map<string, number>>,
   evernoteNotes$: Observable<Required<Link, "uri">[]>
 ) => {
-  const import$ = combineLatest([collections$, evernoteNotes$]).pipe(
+  const import$: Observable<Raindrop[]> = combineLatest([
+    collections$,
+    evernoteNotes$,
+  ]).pipe(
     tap(([, notes]) => log.info(`Importing ${notes.length} Notes`)),
     map(([collectionsMap, notes]): Raindrop[] =>
       notes.map((note) => ({
@@ -189,7 +220,7 @@ const createRaindrops = (
     concatMap((x) => x), // * spread out the array-values into individual emits
     bufferCount(100),
     concatMap((idChunk) => of(idChunk).pipe(delay(3000))),
-    tap(() => log.debug("Processing chunk")),
+    tap((idChunk) => log.info(`Creating a batch of ${idChunk.length} notes`)),
     switchMap((chunk) =>
       batchCreateRaindrops(chunk).pipe(
         catchError((err) => {

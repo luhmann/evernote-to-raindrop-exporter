@@ -14,7 +14,7 @@ export const getImportConfig = async () => {
       type: "select",
       name: "target",
       message:
-        "Do you want to import notebooks by names or stacks of notebooks?",
+        "Do you want to import Evernote notebooks by names or as stacks of notebooks?",
       choices: [
         {
           title: "Notebook Names",
@@ -75,3 +75,12 @@ export const getImportConfig = async () => {
 
   return selection;
 };
+
+export const confirmImport = async () =>
+  await prompts([
+    {
+      type: "confirm",
+      name: "confirmStart",
+      message: "Should the import be started",
+    },
+  ]);

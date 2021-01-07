@@ -1,10 +1,15 @@
 import evernote from "evernote";
-import { EMPTY, forkJoin, from, Observable, timer } from "rxjs";
+import { EMPTY, forkJoin, from, Observable, of, timer } from "rxjs";
 import {
+  bufferCount,
+  concatMap,
   delay,
   delayWhen,
   expand,
+  flatMap,
+  last,
   map,
+  mergeMap,
   reduce,
   retryWhen,
   share,
@@ -138,8 +143,8 @@ const getNotesFromNotebook = (
       const startIndex = Number(res.startIndex);
       const nextOffset = startIndex + Number(res.notes?.length);
       const totalNotes = Number(res.totalNotes);
-      log.debug(
-        `Finding notes in notebook "${notebook.name}" in batches ${nextOffset}/${totalNotes}.`
+      log.info(
+        `Loading notes from "${notebook.name}": ${nextOffset}/${totalNotes}.`
       );
 
       if (Number.isNaN(nextOffset) || Number.isNaN(totalNotes)) {
@@ -180,20 +185,71 @@ const getNotesFromNotebook = (
 const getTagName = async (id: string) => {
   const tag = await noteStore.getTag(id);
 
+  // TODO: probably only wanted by me
   return tag.name?.toLowerCase();
 };
 
-const expandTagNamesOnNotes = (notes: Link[]) =>
-  notes.map(async (note) => {
-    const tagsWithNames = await (note.tags && note.tags.length > 0
-      ? Promise.all(note.tags.map(getTagName))
-      : Promise.resolve([]));
+const loadTagNamesInBatches = (uniqueTagIds: string[]) =>
+  from(uniqueTagIds).pipe(
+    bufferCount(10), // ? max load 10 tags in parallel
+    concatMap((idChunk, index) =>
+      of(idChunk).pipe(
+        tap(() =>
+          log.info(
+            `Loading tag chunk: ${index + 1}/${Math.ceil(
+              uniqueTagIds.length / 10
+            )}`
+          )
+        ),
+        switchMap((chunk) =>
+          forkJoin(chunk.map((id) => getTagName(id))).pipe(
+            map((tagNames) =>
+              tagNames.map((name, index) => ({
+                id: chunk[index],
+                name: name,
+              }))
+            )
+          )
+        ),
+        tap(() =>
+          log.debug(
+            `Finished tag chunk: ${index + 1}/${Math.ceil(
+              uniqueTagIds.length / 10
+            )}`
+          )
+        ),
+        delay(1000)
+      )
+    ),
+    concatMap((x) => x)
+  );
 
-    return {
-      ...note,
-      tags: tagsWithNames as string[],
-    };
-  });
+const expandTagNamesOnNotes = (notesWithTagIds: Link[]) => {
+  const uniqueTagIds = [
+    ...new Set(notesWithTagIds.flatMap((note) => note.tags ?? [])),
+  ];
+
+  log.debug(
+    `Identified ${uniqueTagIds.length} unique tags. They will now be loaded in batches.`
+  );
+
+  return loadTagNamesInBatches(uniqueTagIds).pipe(
+    reduce((acc, item) => {
+      if (item.name) {
+        acc.set(item.id, item.name);
+      }
+      return acc;
+    }, new Map<string, string>()),
+    map((tagIdsToNameMap): Link[] =>
+      notesWithTagIds.map((note) => ({
+        ...note,
+        ...(note.tags
+          ? { tags: note.tags.map((id) => tagIdsToNameMap.get(id) ?? id) }
+          : {}),
+      }))
+    )
+  );
+};
 
 export function importNotes(targetedNotebooks: TargetedNotebooks) {
   const notes: Observable<Link[]> = from(getNotebookList()).pipe(
@@ -206,15 +262,16 @@ export function importNotes(targetedNotebooks: TargetedNotebooks) {
     }),
     // TODO: batch number of notebooks that are loaded concurrently
     switchMap((notebooks) => forkJoin(notebooks.map(getNotesFromNotebook))),
-    map((notebooks) => notebooks.flat()),
-    switchMap((notes) => forkJoin(expandTagNamesOnNotes(notes))),
+    map((notes) => notes.flat()),
+    tap(() => log.debug("Expanding tag names...")),
+    switchMap((notes) => expandTagNamesOnNotes(notes)),
+    tap(() => log.debug("Finished expanding tag names...")),
     retryWhen((err) => {
       // * Evernote applies rate limiting to its APIs, this waits for the returned period of time and then retries the whole operation
       // TODO: check if error is 409 for rate-limiting
-      log.debug(err);
       return err.pipe(
         tap((error) =>
-          log.error(`Download of notes from evernote failed. ${error.message}`)
+          log.error(`Download of notes from evernote failed.`, error)
         ),
         delayWhen((res) => timer(res.rateLimitDuration * 1000)) // ? wait the time requested in API response
       );

@@ -15,6 +15,8 @@ const raindropIds = [1];
 
 const collectionIds = [1];
 
+// TODO: we do not need to clean the raindrops indivudally that are in collections we completely created
+// from scratch ... delete collections first and filter the raindrops from those from the list
 const deleteRaindrops$ = from(raindropIds).pipe(
   bufferCount(120),
   tap((chunk) => log.info("Processing note chunk", chunk)),
@@ -53,5 +55,3 @@ deleteRaindrops$
     concatMap(() => deleteCollections$)
   )
   .subscribe();
-
-// TODO: just deleting collections is enough, notes will be moved to trash
