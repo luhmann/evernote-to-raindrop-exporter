@@ -1,15 +1,10 @@
 import evernote from "evernote";
-import { EMPTY, forkJoin, from, Observable, of, timer } from "rxjs";
+import { EMPTY, forkJoin, from, Observable, timer } from "rxjs";
 import {
-  bufferCount,
-  concatMap,
   delay,
   delayWhen,
   expand,
-  flatMap,
-  last,
   map,
-  mergeMap,
   reduce,
   retryWhen,
   share,
@@ -18,6 +13,7 @@ import {
 } from "rxjs/operators";
 import { config } from "./config";
 import { log } from "./logger";
+import { batchAndDelay } from "./rxjs-operators";
 import { Link } from "./util";
 
 const client = new evernote.Client({
@@ -170,7 +166,7 @@ const getNotesFromNotebook = (
           startIndex + MAXIMUM_BATCH_SIZE,
           MAXIMUM_BATCH_SIZE
         )
-      ).pipe(delay(3000));
+      ).pipe(delay(config.EVERNOTE_API_DELAY));
     }),
     reduce<
       evernote.NoteStore.NotesMetadataList,
@@ -191,37 +187,21 @@ const getTagName = async (id: string) => {
 
 const loadTagNamesInBatches = (uniqueTagIds: string[]) =>
   from(uniqueTagIds).pipe(
-    bufferCount(10), // ? max load 10 tags in parallel
-    concatMap((idChunk, index) =>
-      of(idChunk).pipe(
-        tap(() =>
-          log.info(
-            `Loading tag chunk: ${index + 1}/${Math.ceil(
-              uniqueTagIds.length / 10
-            )}`
+    batchAndDelay(
+      (chunk) =>
+        forkJoin(chunk.map((id) => getTagName(id))).pipe(
+          map((tagNames) =>
+            tagNames.map((name, index) => ({
+              id: chunk[index],
+              name: name,
+            }))
           )
         ),
-        switchMap((chunk) =>
-          forkJoin(chunk.map((id) => getTagName(id))).pipe(
-            map((tagNames) =>
-              tagNames.map((name, index) => ({
-                id: chunk[index],
-                name: name,
-              }))
-            )
-          )
-        ),
-        tap(() =>
-          log.debug(
-            `Finished tag chunk: ${index + 1}/${Math.ceil(
-              uniqueTagIds.length / 10
-            )}`
-          )
-        ),
-        delay(1000)
-      )
-    ),
-    concatMap((x) => x)
+      10,
+      500,
+      "Tags",
+      uniqueTagIds.length
+    )
   );
 
 const expandTagNamesOnNotes = (notesWithTagIds: Link[]) => {
@@ -263,9 +243,7 @@ export function importNotes(targetedNotebooks: TargetedNotebooks) {
     // TODO: batch number of notebooks that are loaded concurrently
     switchMap((notebooks) => forkJoin(notebooks.map(getNotesFromNotebook))),
     map((notes) => notes.flat()),
-    tap(() => log.debug("Expanding tag names...")),
     switchMap((notes) => expandTagNamesOnNotes(notes)),
-    tap(() => log.debug("Finished expanding tag names...")),
     retryWhen((err) => {
       // * Evernote applies rate limiting to its APIs, this waits for the returned period of time and then retries the whole operation
       // TODO: check if error is 409 for rate-limiting

@@ -32,6 +32,8 @@ import {
   Raindrop,
 } from "./lib/raindrops";
 import { convertDateToIso, getEvernoteWebLink, Link } from "./lib/util";
+import { batchAndDelay } from "./lib/rxjs-operators";
+import { config } from "./lib/config";
 
 enum ImportFailureReason {
   NO_LINK = "Note is missing URI, currently only links are supported by this script",
@@ -57,12 +59,9 @@ const filterInvalidNotes = (importFailures$: Subject<ImportFailure>) => (
 
 const setupLogOutput = () => {
   const importFailures$ = new ReplaySubject<ImportFailure>();
-  const importSuccess$ = new ReplaySubject<Raindrop[]>();
+  const importSuccess$ = new ReplaySubject<Raindrop>();
 
-  const importSuccessMessages$ = importSuccess$.pipe(
-    concatMap((x) => x),
-    share()
-  );
+  const importSuccessMessages$ = importSuccess$.pipe(share());
 
   const importFailureMessages$ = importFailures$.pipe(share());
 
@@ -130,7 +129,7 @@ const createMissingEvernoteNotebooksAsCollections = (
         take(1),
         map((answer) => {
           if (answer.confirmStart === false) {
-            process.exit(1);
+            process.exit(0);
           }
 
           return collections;
@@ -199,37 +198,41 @@ const createMissingEvernoteNotebooksAsCollections = (
   return { collections$ };
 };
 
+const mapLinkToRaindrop = ([collectionsMap, notes]: [
+  Map<string, number>,
+  Required<Link, "uri">[]
+]): Raindrop[] =>
+  notes.map((note) => ({
+    collectionId: collectionsMap.get(note.notebook) as number,
+    created: convertDateToIso(note.created),
+    link: note.uri,
+    title: note.title,
+    ...(!!note.tags?.length ? { tags: note.tags } : {}),
+  }));
+
 const createRaindrops = (
   collections$: Observable<Map<string, number>>,
   evernoteNotes$: Observable<Required<Link, "uri">[]>
 ) => {
-  const import$: Observable<Raindrop[]> = combineLatest([
+  const import$: Observable<Raindrop> = combineLatest([
     collections$,
     evernoteNotes$,
   ]).pipe(
     tap(([, notes]) => log.info(`Importing ${notes.length} Notes`)),
-    map(([collectionsMap, notes]): Raindrop[] =>
-      notes.map((note) => ({
-        collectionId: collectionsMap.get(note.notebook) as number,
-        created: convertDateToIso(note.created),
-        link: note.uri,
-        title: note.title,
-        ...(!!note.tags?.length ? { tags: note.tags } : {}),
-      }))
-    ),
+    map(mapLinkToRaindrop),
     concatMap((x) => x), // * spread out the array-values into individual emits
-    bufferCount(100),
-    concatMap((idChunk) => of(idChunk).pipe(delay(3000))),
-    tap((idChunk) => log.info(`Creating a batch of ${idChunk.length} notes`)),
-    switchMap((chunk) =>
-      batchCreateRaindrops(chunk).pipe(
-        catchError((err) => {
-          log.error(err);
-          return of([]);
-        })
-      )
+    batchAndDelay<Raindrop, Raindrop>(
+      (chunk) =>
+        batchCreateRaindrops(chunk).pipe(
+          catchError((err) => {
+            log.error("Failure while creating batch of raindrops", err);
+            return of([]);
+          })
+        ),
+      config.RAINDROPS_API_BATCH_SIZE,
+      config.RAINDROPS_API_DELAY,
+      "Raindrops"
     ),
-    tap(() => log.debug("Successfully created chunk of notes")),
     share()
   );
 
@@ -262,8 +265,8 @@ const createRaindrops = (
   const { import$ } = createRaindrops(collections$, evernoteNotes$);
 
   import$.subscribe(
-    (notes) => {
-      importSuccess$.next(notes);
+    (note) => {
+      importSuccess$.next(note);
     },
     (err) => log.fatal("Import failed without recovery", err),
     () => {
