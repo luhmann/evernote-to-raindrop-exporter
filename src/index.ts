@@ -1,3 +1,4 @@
+import { difference } from "remeda";
 import {
   combineLatest,
   forkJoin,
@@ -8,10 +9,8 @@ import {
   Subject,
 } from "rxjs";
 import {
-  bufferCount,
   catchError,
   concatMap,
-  delay,
   map,
   reduce,
   share,
@@ -19,21 +18,25 @@ import {
   take,
   tap,
 } from "rxjs/operators";
-import { difference } from "remeda";
 import type { Required } from "utility-types";
 import { confirmImport, getImportConfig } from "./lib/cli";
-import { importNotes, TargetedNotebooks } from "./lib/evernote";
+import { config, loadToken } from "./lib/config";
 import { log } from "./lib/logger";
+import {
+  createEvernoteClient,
+  importNotes,
+  TargetedNotebooks,
+} from "./lib/evernote";
 import {
   batchCreateRaindrops,
   createCollection,
+  createRaindropClient,
   getAllCollections,
   mapCollections,
   Raindrop,
 } from "./lib/raindrops";
-import { convertDateToIso, getEvernoteWebLink, Link } from "./lib/util";
 import { batchAndDelay } from "./lib/rxjs-operators";
-import { config } from "./lib/config";
+import { convertDateToIso, getEvernoteWebLink, Link } from "./lib/util";
 
 enum ImportFailureReason {
   NO_LINK = "Note is missing URI, currently only links are supported by this script",
@@ -241,12 +244,17 @@ const createRaindrops = (
 };
 
 (async function () {
+  await loadToken();
+
+  createEvernoteClient();
+  createRaindropClient();
+
   const selection = await getImportConfig();
 
   log.debug("Import-Selection:", selection);
 
   const targetedNotebooks: TargetedNotebooks = {
-    ...(selection.target = "all" ? { all: true } : {}),
+    ...(selection.target === "all" ? { all: true } : {}),
     ...(selection.target === "names" ? { names: selection.selectedNames } : {}),
     ...(selection.target === "stacks"
       ? { stacks: selection.selectedStacks }

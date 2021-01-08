@@ -1,23 +1,30 @@
-import got, { NormalizedOptions } from "got";
+import got, { Got, NormalizedOptions } from "got";
 import { from, Observable } from "rxjs";
 import { map } from "rxjs/operators";
 import { config } from "./config";
 import { log } from "./logger";
 
-const requestClient = got.extend({
-  headers: {
-    Authorization: `Bearer ${config?.RAINDROPS_TOKEN}`,
-  },
-  hooks: {
-    beforeRequest: [
-      (options: NormalizedOptions) => {
-        log.debug(`${options.method} ${options.url.href}`);
-      },
-    ],
-  },
-  prefixUrl: config?.RAINDROPS_API_URL,
-  responseType: "json",
-});
+let requestClient: Got;
+
+export const createRaindropClient = () => {
+  const client = got.extend({
+    headers: {
+      Authorization: `Bearer ${config.getRaindropToken()}`,
+    },
+    hooks: {
+      beforeRequest: [
+        (options: NormalizedOptions) => {
+          log.debug(`${options.method} ${options.url.href}`);
+        },
+      ],
+    },
+    prefixUrl: config?.RAINDROPS_API_URL,
+    responseType: "json",
+  });
+
+  requestClient = client;
+  return client;
+};
 
 type RaindropBaseResponse<T> = {
   result: boolean;

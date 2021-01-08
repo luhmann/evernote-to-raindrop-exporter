@@ -94,3 +94,35 @@ export const confirmImport = async () =>
       message: "Should the import be started",
     },
   ]);
+
+export const requestToken = async () =>
+  await prompts([
+    {
+      type: "password",
+      name: "evernoteToken",
+      message:
+        "Enter your API-Token for Evernote. Check the README to find out how to generate one.",
+      validate: (token: string) => {
+        if (!token.includes("en-devtoken")) {
+          return "Wrong token format: Token should have a format similar to this 'S=s1:U=8f219:E=154308dc976:C=14cd8dc9cd8:P=1cd:A=en-devtoken:V=2:H=1e4d28c7982faf6222ecf55df3a2e84b'. 'Please refer to 'https://dev.evernote.com/doc/articles/dev_tokens.php' for instructions on how to generate one";
+        }
+
+        return true;
+      },
+    },
+    {
+      type: "password",
+      name: "raindropToken",
+      message:
+        "Enter your API-Token for raindrop.io. Check the README to find out how to generate one.",
+      validate: (token: string) => {
+        const uuidv4Regex = /^[0-9A-F]{8}-[0-9A-F]{4}-4[0-9A-F]{3}-[89AB][0-9A-F]{3}-[0-9A-F]{12}$/i;
+
+        if (token.length !== 36 || !token.match(uuidv4Regex)) {
+          return "Wrong token format: Token should be a uuidv4, of this format 'xxxxxxxx-xxxx-4xxx-xxxx-xxxxxxxxxxxx'. Refer to the instructions on how to generate a 'test token': 'https://developer.raindrop.io/v1/authentication/token'";
+        }
+
+        return true;
+      },
+    },
+  ]);

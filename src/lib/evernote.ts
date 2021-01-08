@@ -1,14 +1,11 @@
 import evernote from "evernote";
-import { EMPTY, forkJoin, from, Observable, timer } from "rxjs";
+import { EMPTY, forkJoin, from, Observable } from "rxjs";
 import {
   bufferCount,
-  concatMap,
   delay,
-  delayWhen,
   expand,
   map,
   reduce,
-  retryWhen,
   share,
   switchMap,
   tap,
@@ -18,11 +15,17 @@ import { log } from "./logger";
 import { batchAndDelay, retryRateLimitedCalls } from "./rxjs-operators";
 import { Link } from "./util";
 
-const client = new evernote.Client({
-  token: config?.EVERNOTE_AUTH_TOKEN,
-  sandbox: false,
-});
-const noteStore = client.getNoteStore();
+let noteStore: evernote.NoteStoreClient;
+
+export const createEvernoteClient = () => {
+  const client = new evernote.Client({
+    token: config.getEvernoteToken(),
+    sandbox: false,
+  });
+  noteStore = client.getNoteStore();
+
+  return client;
+};
 
 const notebookDataToLoad = new evernote.NoteStore.NotesMetadataResultSpec({
   includeTitle: true,
