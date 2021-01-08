@@ -15,7 +15,7 @@ import {
 } from "rxjs/operators";
 import { config } from "./config";
 import { log } from "./logger";
-import { batchAndDelay } from "./rxjs-operators";
+import { batchAndDelay, retryRateLimitedCalls } from "./rxjs-operators";
 import { Link } from "./util";
 
 const client = new evernote.Client({
@@ -59,13 +59,19 @@ export const getAllNotebooksAndStacks = async () => {
 };
 
 export type TargetedNotebooks = {
+  all?: boolean;
   stacks?: string[];
   names?: string[];
 };
 
-const filterRelevantNotebooks = ({ stacks, names }: TargetedNotebooks) => (
+const filterRelevantNotebooks = ({ stacks, names, all }: TargetedNotebooks) => (
   notebooks: evernote.Types.Notebook[]
 ) => {
+  if (all) {
+    log.debug("Selected all notebooks");
+    return notebooks;
+  }
+
   const filteredNotebooks = notebooks.filter((notebook) => {
     const stackPredicate =
       !stacks?.length ||
@@ -183,8 +189,7 @@ const getNotesFromNotebook = (
 const getTagName = async (id: string) => {
   const tag = await noteStore.getTag(id);
 
-  // TODO: probably only wanted by me
-  return tag.name?.toLowerCase();
+  return tag.name;
 };
 
 const loadTagNamesInBatches = (uniqueTagIds: string[]) =>
@@ -192,11 +197,15 @@ const loadTagNamesInBatches = (uniqueTagIds: string[]) =>
     batchAndDelay(
       (chunk) =>
         forkJoin(chunk.map((id) => getTagName(id))).pipe(
-          map((tagNames) =>
-            tagNames.map((name, index) => ({
-              id: chunk[index],
-              name: name,
-            }))
+          map(
+            (tagNames) =>
+              tagNames.map((name, index) => ({
+                id: chunk[index],
+                name: name,
+              })),
+            retryRateLimitedCalls((err) =>
+              log.error("Request for tags failed", err)
+            )
           )
         ),
       10,
@@ -256,7 +265,13 @@ export function importNotes(targetedNotebooks: TargetedNotebooks) {
         batchAndDelay(
           (notebooks) =>
             forkJoin(
-              notebooks.map((notebook) => getNotesFromNotebook(notebook))
+              notebooks.map((notebook) =>
+                getNotesFromNotebook(notebook).pipe(
+                  retryRateLimitedCalls((err) =>
+                    log.error("Notebook-Request failed.", err)
+                  )
+                )
+              )
             ),
           NOTEBOOK_BATCH_SIZE,
           config.EVERNOTE_API_DELAY,
@@ -269,16 +284,6 @@ export function importNotes(targetedNotebooks: TargetedNotebooks) {
     tap(() => log.debug("Finished loading notebooks")),
     map((notes) => notes.flat()),
     switchMap((notes) => expandTagNamesOnNotes(notes)),
-    retryWhen((err) => {
-      // * Evernote applies rate limiting to its APIs, this waits for the returned period of time and then retries the whole operation
-      // TODO: check if error is 409 for rate-limiting
-      return err.pipe(
-        tap((error) =>
-          log.error(`Download of notes from evernote failed.`, error)
-        ),
-        delayWhen((res) => timer(res.rateLimitDuration * 1000)) // ? wait the time requested in API response
-      );
-    }),
     share()
   );
 

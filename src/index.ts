@@ -246,6 +246,7 @@ const createRaindrops = (
   log.debug("Import-Selection:", selection);
 
   const targetedNotebooks: TargetedNotebooks = {
+    ...(selection.target = "all" ? { all: true } : {}),
     ...(selection.target === "names" ? { names: selection.selectedNames } : {}),
     ...(selection.target === "stacks"
       ? { stacks: selection.selectedStacks }

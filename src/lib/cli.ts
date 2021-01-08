@@ -1,6 +1,7 @@
 import ora from "ora";
 import prompts from "prompts";
 import { getAllNotebooksAndStacks } from "./evernote";
+import { log } from "./logger";
 
 type TargetSelection = "names" | "stacks";
 
@@ -16,6 +17,12 @@ export const getImportConfig = async () => {
       message:
         "Do you want to import Evernote notebooks by names or as stacks of notebooks?",
       choices: [
+        {
+          title: "All Notes",
+          description:
+            "Will look for links in the meta-data of all notes in all notebooks",
+          value: "all",
+        },
         {
           title: "Notebook Names",
           description:
@@ -58,9 +65,9 @@ export const getImportConfig = async () => {
       type: "confirm",
       name: "confirm",
       message: (prev) =>
-        `This will attempt to import "${prev.join(
-          ", "
-        )}". Did you backup your data here "https://app.raindrop.io/settings/backups"?`,
+        `This will attempt to import "${
+          prev === "all" ? "all notes" : prev.join(", ")
+        }". Did you backup your data here "https://app.raindrop.io/settings/backups"?`,
     },
   ];
 
@@ -68,8 +75,11 @@ export const getImportConfig = async () => {
 
   if (
     selection?.confirm !== true ||
-    (!selection.selectedStacks && !selection.selectedNames)
+    (selection.target !== "all" &&
+      !selection.selectedStacks &&
+      !selection.selectedNames)
   ) {
+    log.error("No valid import-options selected. Aborting.");
     process.exit(0);
   }
 

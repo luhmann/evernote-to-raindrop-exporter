@@ -1,20 +1,17 @@
 import {
-  forkJoin,
-  from,
+  MonoTypeOperatorFunction,
   Observable,
-  ObservableInput,
-  ObservedValueOf,
   of,
   OperatorFunction,
   pipe,
-  throwError,
+  timer,
 } from "rxjs";
 import {
   bufferCount,
-  catchError,
   concatMap,
   delay,
-  filter,
+  delayWhen,
+  retryWhen,
   switchMap,
   tap,
 } from "rxjs/operators";
@@ -50,7 +47,18 @@ export function debug(tag: string) {
   });
 }
 
-// TODO: Error handling when chunk fails
+/**
+ * Takes in a stream, chunks the emissions in configured pieces and processes them serially.
+ *
+ * Intended to be used when you make a lot of calls against a rate-limited API or just want to be considerate.
+ *
+ * @note Error-Handling needs to be done within the observable that is returned from `project`
+ * @param project
+ * @param chunkSize
+ * @param delayBetweenChunks
+ * @param tag
+ * @param collectionSize
+ */
 export function batchAndDelay<T, R>(
   project: (value: T[], index: number) => Observable<R[]>,
   chunkSize: number,
@@ -73,5 +81,30 @@ export function batchAndDelay<T, R>(
       )
     ),
     concatMap((x) => x)
+  );
+}
+
+export function retryRateLimitedCalls<T>(
+  loggingFunction?: (err: any) => void,
+  wait?: number,
+  durationFieldName = "rateLimitDuration"
+): MonoTypeOperatorFunction<T> {
+  return pipe(
+    retryWhen((err) =>
+      err.pipe(
+        tap((err) => {
+          if (loggingFunction) {
+            loggingFunction(err);
+          }
+        }),
+        delayWhen((res) => {
+          const duration = wait ?? (res[durationFieldName] * 1000 || 5000);
+
+          log.info(`Repeating failing request in "${duration}ms"`);
+
+          return timer(duration);
+        })
+      )
+    )
   );
 }
