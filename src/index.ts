@@ -100,6 +100,7 @@ const setupLogOutput = () => {
       console.log(
         failures.map((failure) => [
           `Title: ${failure.note.title}`,
+          `Notebook: ${failure.note.notebook}`,
           getEvernoteWebLink(failure.note.notebookId, failure.note.id) ??
             failure.note.notebookId,
         ])

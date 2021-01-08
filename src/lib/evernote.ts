@@ -1,6 +1,8 @@
 import evernote from "evernote";
 import { EMPTY, forkJoin, from, Observable, timer } from "rxjs";
 import {
+  bufferCount,
+  concatMap,
   delay,
   delayWhen,
   expand,
@@ -231,17 +233,40 @@ const expandTagNamesOnNotes = (notesWithTagIds: Link[]) => {
   );
 };
 
-export function importNotes(targetedNotebooks: TargetedNotebooks) {
-  const notes: Observable<Link[]> = from(getNotebookList()).pipe(
+const resolveTargetedNotebooks = (targetedNotebooks: TargetedNotebooks) =>
+  from(getNotebookList()).pipe(
     map(filterRelevantNotebooks(targetedNotebooks)),
     tap((notebooks) => {
       const notebookNames = notebooks
         .map((notebook) => `"${notebook.name}"`)
         .join(", ");
       log.info(`Found ${notebooks.length} Notebooks: ${notebookNames}`);
+    })
+  );
+
+export function importNotes(targetedNotebooks: TargetedNotebooks) {
+  const notebooks$ = resolveTargetedNotebooks(targetedNotebooks);
+
+  const notes: Observable<Link[]> = notebooks$.pipe(
+    switchMap((notebooks) => {
+      const NOTEBOOK_BATCH_SIZE = 10;
+      const totalNotebooks = notebooks.length;
+
+      return from(notebooks).pipe(
+        batchAndDelay(
+          (notebooks) =>
+            forkJoin(
+              notebooks.map((notebook) => getNotesFromNotebook(notebook))
+            ),
+          NOTEBOOK_BATCH_SIZE,
+          config.EVERNOTE_API_DELAY,
+          "Notebooks",
+          totalNotebooks
+        ),
+        bufferCount(totalNotebooks)
+      );
     }),
-    // TODO: batch number of notebooks that are loaded concurrently
-    switchMap((notebooks) => forkJoin(notebooks.map(getNotesFromNotebook))),
+    tap(() => log.debug("Finished loading notebooks")),
     map((notes) => notes.flat()),
     switchMap((notes) => expandTagNamesOnNotes(notes)),
     retryWhen((err) => {
