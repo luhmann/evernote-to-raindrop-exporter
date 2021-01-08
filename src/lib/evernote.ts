@@ -223,8 +223,8 @@ const expandTagNamesOnNotes = (notesWithTagIds: Link[]) => {
     ...new Set(notesWithTagIds.flatMap((note) => note.tags ?? [])),
   ];
 
-  log.debug(
-    `Identified ${uniqueTagIds.length} unique tags. They will now be loaded in batches.`
+  log.info(
+    `Identified ${uniqueTagIds.length} unique tags, which will now be loaded in batches.`
   );
 
   return loadTagNamesInBatches(uniqueTagIds).pipe(

@@ -15,7 +15,7 @@ export const getImportConfig = async () => {
       type: "select",
       name: "target",
       message:
-        "Do you want to import Evernote notebooks by names or as stacks of notebooks?",
+        "Do you want to import everything, Evernote notebooks by name or 'stacks' of notebooks?",
       choices: [
         {
           title: "All Notes",
@@ -32,7 +32,7 @@ export const getImportConfig = async () => {
         {
           title: "Stacks",
           description:
-            "Stacks are collections of notebooks. If never heard the term, this is probably not what you want.",
+            "Stacks are collections of notebooks. If you never heard the term, this is probably not what you want.",
           value: "stacks",
         },
       ],
@@ -67,7 +67,7 @@ export const getImportConfig = async () => {
       message: (prev) =>
         `This will attempt to import "${
           prev === "all" ? "all notes" : prev.join(", ")
-        }". Did you backup your data here "https://app.raindrop.io/settings/backups"?`,
+        }". Did you backup your data as described here: "https://app.raindrop.io/settings/backups"?`,
     },
   ];
 
@@ -91,7 +91,7 @@ export const confirmImport = async () =>
     {
       type: "confirm",
       name: "confirmStart",
-      message: "Should the import be started",
+      message: "Do you want to proceed?",
     },
   ]);
 

@@ -1,5 +1,6 @@
 import { difference } from "remeda";
 import {
+  BehaviorSubject,
   combineLatest,
   forkJoin,
   from,
@@ -39,7 +40,7 @@ import { batchAndDelay } from "./lib/rxjs-operators";
 import { convertDateToIso, getEvernoteWebLink, Link } from "./lib/util";
 
 enum ImportFailureReason {
-  NO_LINK = "Note is missing URI, currently only links are supported by this script",
+  NO_LINK = "Note is missing URI, currently only links are supported by this script.",
 }
 
 type ImportFailure = {
@@ -116,8 +117,12 @@ const setupLogOutput = () => {
 const createMissingEvernoteNotebooksAsCollections = (
   evernoteNotes$: Observable<Link[]>
 ) => {
+  const totalNotes$ = new BehaviorSubject<number>(0);
   const existingCollections$ = getAllCollections().pipe(map(mapCollections));
   const requiredCollections$ = evernoteNotes$.pipe(
+    tap((notes) => {
+      totalNotes$.next(notes.length);
+    }),
     map(
       (notes: Link[]) =>
         new Set([...notes.map((note) => note.notebook)].filter(Boolean))
@@ -128,18 +133,6 @@ const createMissingEvernoteNotebooksAsCollections = (
     existingCollections$,
     requiredCollections$,
   ]).pipe(
-    switchMap((collections) =>
-      from(confirmImport()).pipe(
-        take(1),
-        map((answer) => {
-          if (answer.confirmStart === false) {
-            process.exit(0);
-          }
-
-          return collections;
-        })
-      )
-    ),
     map(([existingCollections, requiredCollections]) => {
       const existingNames = existingCollections.map(
         (collection) => collection.name
@@ -163,6 +156,27 @@ const createMissingEvernoteNotebooksAsCollections = (
 
       return missingCollections;
     }),
+    tap((collections) =>
+      log.info(
+        `You are about to create ${
+          collections.length
+            ? collections.length + " new collection(s) and "
+            : ""
+        }${totalNotes$.value} new links on raindrop.io.`
+      )
+    ),
+    switchMap((collections) =>
+      from(confirmImport()).pipe(
+        take(1),
+        map((answer) => {
+          if (answer.confirmStart === true) {
+            return collections;
+          }
+
+          process.exit(0);
+        })
+      )
+    ),
     switchMap((collections) => {
       if (collections.length > 0) {
         return forkJoin(
@@ -177,7 +191,7 @@ const createMissingEvernoteNotebooksAsCollections = (
     }),
     tap((collections) => {
       for (const collection of collections) {
-        log.info(
+        log.debug(
           `Successfully created collection "${collection.title}" with id "${collection._id}"`
         );
       }
@@ -222,21 +236,27 @@ const createRaindrops = (
     collections$,
     evernoteNotes$,
   ]).pipe(
-    tap(([, notes]) => log.info(`Importing ${notes.length} Notes`)),
+    tap(([, raindrops]) => log.info(`Importing ${raindrops.length} Raindrops`)),
     map(mapLinkToRaindrop),
-    concatMap((x) => x), // * spread out the array-values into individual emits
-    batchAndDelay<Raindrop, Raindrop>(
-      (chunk) =>
-        batchCreateRaindrops(chunk).pipe(
-          catchError((err) => {
-            log.error("Failure while creating batch of raindrops", err);
-            return of([]);
-          })
-        ),
-      config.RAINDROPS_API_BATCH_SIZE,
-      config.RAINDROPS_API_DELAY,
-      "Raindrops"
-    ),
+    switchMap((raindrops) => {
+      const totalRaindrops = raindrops.length;
+      return of(raindrops).pipe(
+        concatMap((x) => x), // * spread out the array-values into individual emits
+        batchAndDelay<Raindrop, Raindrop>(
+          (chunk) =>
+            batchCreateRaindrops(chunk).pipe(
+              catchError((err) => {
+                log.error("Failure while creating batch of raindrops", err);
+                return of([]);
+              })
+            ),
+          config.RAINDROPS_API_BATCH_SIZE,
+          config.RAINDROPS_API_DELAY,
+          "Raindrops",
+          totalRaindrops
+        )
+      );
+    }),
     share()
   );
 

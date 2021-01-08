@@ -29,7 +29,7 @@ const config = {
   RAINDROPS_API_BATCH_SIZE: 100,
   EVERNOTE_API_DELAY: 2000,
   RAINDROPS_API_URL: "https://api.raindrop.io/rest/v1",
-  DEBUG: true,
+  DEBUG: false,
   getEvernoteToken: () => token?.EVERNOTE_TOKEN,
   getRaindropToken: () => token?.RAINDROPS_TOKEN,
 };
