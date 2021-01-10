@@ -1,5 +1,6 @@
 import ora from "ora";
 import prompts from "prompts";
+import figlet from "figlet";
 import { getAllNotebooksAndStacks } from "./evernote";
 import { log } from "./logger";
 
@@ -126,3 +127,6 @@ export const requestToken = async () =>
       },
     },
   ]);
+
+export const renderIntro = async () =>
+  console.log(figlet.textSync("Evernote to Raindrop.io", {}));

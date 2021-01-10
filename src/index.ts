@@ -20,7 +20,7 @@ import {
   tap,
 } from "rxjs/operators";
 import type { Required } from "utility-types";
-import { confirmImport, getImportConfig } from "./lib/cli";
+import { confirmImport, getImportConfig, renderIntro } from "./lib/cli";
 import { config, loadToken } from "./lib/config";
 import { log } from "./lib/logger";
 import {
@@ -264,6 +264,7 @@ const createRaindrops = (
 };
 
 (async function () {
+  renderIntro();
   await loadToken();
 
   createEvernoteClient();

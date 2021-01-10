@@ -8,8 +8,8 @@ import {
   switchMap,
   tap,
 } from "rxjs/operators";
-import { log } from "./src/lib/logger";
-import { deleteCollections, deleteRaindrop } from "./src/lib/raindrops";
+import { log } from "../lib/logger";
+import { deleteCollections, deleteRaindrop } from "../lib/raindrops";
 
 const raindropIds = [1];
 
