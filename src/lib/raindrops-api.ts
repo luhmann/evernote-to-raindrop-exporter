@@ -20,6 +20,21 @@ export const createRaindropClient = () => {
     },
     prefixUrl: config?.RAINDROPS_API_URL,
     responseType: "json",
+    retry: {
+      limit: 2,
+      methods: ["GET", "POST", "PUT", "HEAD", "DELETE", "OPTIONS", "TRACE"],
+      statusCodes: [408, 413, 429, 500, 502, 503, 504, 521, 522, 524],
+      calculateDelay: ({ error, computedValue }) => {
+        if (error.response?.statusCode === 429) {
+          const resetTimestamp = Number(
+            error.response?.headers?.["x-ratelimit-reset"]
+          );
+          return resetTimestamp ? +Date.now() - resetTimestamp : 60_000;
+        }
+
+        return computedValue;
+      },
+    },
   });
 
   requestClient = client;

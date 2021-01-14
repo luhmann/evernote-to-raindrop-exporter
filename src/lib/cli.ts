@@ -88,13 +88,15 @@ export const getImportConfig = async () => {
 };
 
 export const confirmImport = async () =>
-  await prompts([
-    {
-      type: "confirm",
-      name: "confirmStart",
-      message: "Do you want to proceed?",
-    },
-  ]);
+  process.env.NODE_ENV === "test"
+    ? Promise.resolve({ confirmStart: true })
+    : await prompts([
+        {
+          type: "confirm",
+          name: "confirmStart",
+          message: "Do you want to proceed?",
+        },
+      ]);
 
 export const requestToken = async () =>
   await prompts([

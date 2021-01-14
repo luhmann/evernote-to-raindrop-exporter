@@ -47,7 +47,7 @@ Content-Type: application/json
 
 {
   "link": "https://javascript.info/ninja-code",
-  "collectionId": "15556704",
+  "collectionId": "15853068",
   "created": "2020-08-22T07:25:12.000Z",
   "tags": ["codestyle", "lessons learned"],
   "excerpt": "...when discussing why writing code in a very complex way is not a good idea",

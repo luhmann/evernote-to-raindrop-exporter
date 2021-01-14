@@ -145,11 +145,11 @@ const mapLinkToRaindrop = ([collectionsMap, notes]: [
   }));
 
 export const createRaindrops = (
-  collections$: Observable<Map<string, number>>,
+  collectionsMap$: Observable<Map<string, number>>,
   srcLinks$: Observable<RaindropLink[]>
 ) => {
   const import$: Observable<Raindrop> = combineLatest([
-    collections$,
+    collectionsMap$,
     srcLinks$,
   ]).pipe(
     tap(([, raindrops]) => log.info(`Importing ${raindrops.length} Raindrops`)),
