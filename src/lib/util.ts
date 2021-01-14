@@ -16,7 +16,7 @@ export type Link = {
   description?: string;
 };
 
-export const getEvernoteWebLink = (notebook?: string, note?: string) =>
-  notebook && note
-    ? `https://www.evernote.com/client/web#?b=${notebook}&n=${note}`
+export const getEvernoteWebLink = (notebookId?: string, noteId?: string) =>
+  notebookId && noteId
+    ? `https://www.evernote.com/client/web#?b=${notebookId}&n=${noteId}`
     : undefined;

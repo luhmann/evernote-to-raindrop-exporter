@@ -1,3 +1,4 @@
+import evernote from "evernote";
 import {
   MonoTypeOperatorFunction,
   Observable,
@@ -11,8 +12,11 @@ import {
   concatMap,
   delay,
   delayWhen,
+  map,
+  mergeMap,
   retryWhen,
   switchMap,
+  take,
   tap,
 } from "rxjs/operators";
 import { log } from "./logger";
@@ -77,32 +81,38 @@ export function batchAndDelay<T, R>(
           log.info(`${tag ? `[${tag}]:` : ""} Process chunk ${progress}`);
         }),
         switchMap(project),
-        delay(delayBetweenChunks)
+        delay(index === 0 ? 0 : delayBetweenChunks)
       )
     ),
     concatMap((x) => x)
   );
 }
 
-export function retryRateLimitedCalls<T>(
+export function retryRequests<T>(
+  retryPredicate: (err: any) => number | false,
   loggingFunction?: (err: any) => void,
-  wait?: number,
-  durationFieldName = "rateLimitDuration"
+  maxRetries = 5
 ): MonoTypeOperatorFunction<T> {
   return pipe(
-    retryWhen((err) =>
-      err.pipe(
-        tap((err) => {
+    retryWhen((input) =>
+      input.pipe(
+        mergeMap((error, attempt) => {
           if (loggingFunction) {
-            loggingFunction(err);
+            loggingFunction(error);
           }
-        }),
-        delayWhen((res) => {
-          const duration = wait ?? (res[durationFieldName] * 1000 || 5000);
 
-          log.info(`Repeating failing request in "${duration}ms"`);
+          const durationOrAbort = retryPredicate(error);
 
-          return timer(duration);
+          if (durationOrAbort === false || attempt >= maxRetries) {
+            if (attempt > maxRetries) {
+              log.error("Exceeded maximum number of retries");
+            }
+            throw error;
+          }
+
+          log.info(`Retrying failing request in "${durationOrAbort}ms"`);
+
+          return timer(durationOrAbort);
         })
       )
     )

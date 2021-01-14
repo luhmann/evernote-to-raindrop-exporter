@@ -25,9 +25,9 @@ export const loadToken = async () => {
 };
 
 const config = {
-  RAINDROPS_API_DELAY: 2000,
+  RAINDROPS_API_DELAY: process.env.NODE_ENV === "test" ? 0 : 2000,
   RAINDROPS_API_BATCH_SIZE: 100,
-  EVERNOTE_API_DELAY: 2000,
+  EVERNOTE_API_DELAY: process.env.NODE_ENV === "test" ? 0 : 1000,
   RAINDROPS_API_URL: "https://api.raindrop.io/rest/v1",
   DEBUG: false,
   getEvernoteToken: () => token?.EVERNOTE_TOKEN,

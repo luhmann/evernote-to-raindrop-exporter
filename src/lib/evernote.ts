@@ -1,5 +1,5 @@
 import evernote from "evernote";
-import { EMPTY, forkJoin, from, Observable } from "rxjs";
+import { defer, EMPTY, forkJoin, from, Observable } from "rxjs";
 import {
   bufferCount,
   delay,
@@ -12,7 +12,7 @@ import {
 } from "rxjs/operators";
 import { config } from "./config";
 import { log } from "./logger";
-import { batchAndDelay, retryRateLimitedCalls } from "./rxjs-operators";
+import { batchAndDelay, retryRequests } from "./rxjs-operators";
 import { Link } from "./util";
 
 let noteStore: evernote.NoteStoreClient;
@@ -25,6 +25,18 @@ export const createEvernoteClient = () => {
   noteStore = client.getNoteStore();
 
   return client;
+};
+
+const evernoteRetryPredicate = (err: any): number | false => {
+  if (err instanceof evernote.Errors.EDAMSystemException) {
+    if (err?.errorCode === evernote.Errors.EDAMErrorCode.RATE_LIMIT_REACHED) {
+      return err.rateLimitDuration * 1000;
+    }
+
+    return config.EVERNOTE_API_DELAY;
+  }
+
+  return false;
 };
 
 const notebookDataToLoad = new evernote.NoteStore.NotesMetadataResultSpec({
@@ -127,23 +139,25 @@ const getRangeOfNotesFromNotebook = (
   notebook: evernote.Types.Notebook,
   offset: number,
   limit: number
-): Promise<evernote.NoteStore.NotesMetadataList> => {
+): Observable<evernote.NoteStore.NotesMetadataList> => {
   const notebookFilter = new evernote.NoteStore.NoteFilter({
     notebookGuid: notebook.guid,
   });
 
-  return noteStore.findNotesMetadata(
-    notebookFilter,
-    offset,
-    limit,
-    notebookDataToLoad
+  return from(
+    noteStore.findNotesMetadata(
+      notebookFilter,
+      offset,
+      limit,
+      notebookDataToLoad
+    )
   );
 };
 
 const getNotesFromNotebook = (
   notebook: evernote.Types.Notebook
 ): Observable<Link[]> => {
-  return from(
+  return defer(() =>
     getRangeOfNotesFromNotebook(notebook, 0, MAXIMUM_BATCH_SIZE)
   ).pipe(
     expand((res) => {
@@ -171,12 +185,10 @@ const getNotesFromNotebook = (
         return EMPTY;
       }
 
-      return from(
-        getRangeOfNotesFromNotebook(
-          notebook,
-          startIndex + MAXIMUM_BATCH_SIZE,
-          MAXIMUM_BATCH_SIZE
-        )
+      return getRangeOfNotesFromNotebook(
+        notebook,
+        startIndex + MAXIMUM_BATCH_SIZE,
+        MAXIMUM_BATCH_SIZE
       ).pipe(delay(config.EVERNOTE_API_DELAY));
     }),
     reduce<
@@ -185,6 +197,9 @@ const getNotesFromNotebook = (
     >((acc, current) => [...acc, ...(current.notes ?? [])], []),
     map((notes) =>
       notes?.map((note) => getRelevantNoteData(note, notebook.name))
+    ),
+    retryRequests(evernoteRetryPredicate, (err) =>
+      log.debug("Notebook-Request failed.", err)
     )
   );
 };
@@ -199,20 +214,19 @@ const loadTagNamesInBatches = (uniqueTagIds: string[]) =>
   from(uniqueTagIds).pipe(
     batchAndDelay(
       (chunk) =>
-        forkJoin(chunk.map((id) => getTagName(id))).pipe(
-          map(
-            (tagNames) =>
-              tagNames.map((name, index) => ({
-                id: chunk[index],
-                name: name,
-              })),
-            retryRateLimitedCalls((err) =>
-              log.error("Request for tags failed", err)
-            )
+        defer(() => forkJoin(chunk.map((id) => getTagName(id)))).pipe(
+          retryRequests(evernoteRetryPredicate, (err) =>
+            log.debug("Request for tags failed", err)
+          ),
+          map((tagNames) =>
+            tagNames.map((name, index) => ({
+              id: chunk[index],
+              name: name,
+            }))
           )
         ),
       10,
-      500,
+      config.EVERNOTE_API_DELAY,
       "Tags",
       uniqueTagIds.length
     )
@@ -256,7 +270,7 @@ const resolveTargetedNotebooks = (targetedNotebooks: TargetedNotebooks) =>
     })
   );
 
-export function importNotes(targetedNotebooks: TargetedNotebooks) {
+export const importNotes = (targetedNotebooks: TargetedNotebooks) => {
   const notebooks$ = resolveTargetedNotebooks(targetedNotebooks);
 
   const notes: Observable<Link[]> = notebooks$.pipe(
@@ -268,13 +282,7 @@ export function importNotes(targetedNotebooks: TargetedNotebooks) {
         batchAndDelay(
           (notebooks) =>
             forkJoin(
-              notebooks.map((notebook) =>
-                getNotesFromNotebook(notebook).pipe(
-                  retryRateLimitedCalls((err) =>
-                    log.error("Notebook-Request failed.", err)
-                  )
-                )
-              )
+              notebooks.map((notebook) => getNotesFromNotebook(notebook))
             ),
           NOTEBOOK_BATCH_SIZE,
           config.EVERNOTE_API_DELAY,
@@ -291,4 +299,4 @@ export function importNotes(targetedNotebooks: TargetedNotebooks) {
   );
 
   return notes;
-}
+};
