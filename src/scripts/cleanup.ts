@@ -9,13 +9,13 @@ import {
   tap,
 } from "rxjs/operators";
 import { log } from "../lib/logger";
-import { deleteCollections, deleteRaindrop } from "../lib/raindrops";
+import { deleteCollections, deleteRaindrop } from "../lib/raindrops-api";
 
 const raindropIds = [1];
 
 const collectionIds = [1];
 
-// TODO: we do not need to clean the raindrops indivudally that are in collections we completely created
+// TODO: we do not need to clean the raindrops individually that are in collections we completely created
 // from scratch ... delete collections first and filter the raindrops from those from the list
 const deleteRaindrops$ = from(raindropIds).pipe(
   bufferCount(120),
