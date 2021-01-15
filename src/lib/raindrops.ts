@@ -162,7 +162,7 @@ export const createRaindrops = (
           (chunk) =>
             batchCreateRaindrops(chunk).pipe(
               catchError((err) => {
-                log.error("Failure while creating batch of raindrops", err);
+                log.debug("Failure while creating batch of raindrops", err);
                 return of([]);
               })
             ),
