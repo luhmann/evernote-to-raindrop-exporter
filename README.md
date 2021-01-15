@@ -16,15 +16,13 @@ Export your [Evernote](https://evernote.com)-Notes that contain a url (usually a
 
 ### ☝️ Backup your data
 
-Before you proceed it is imperative to backup your data. This script has only been tested with my notes and my data and everything went fine, but due to this I cannot guarantee that you will like the end result. So please make sure that you can revert the changes.
+Before you proceed please backup your data. This script has only been tested with my notes and my data and everything went fine, but due to this I cannot guarantee that you will like the end-result. So please make sure that you can revert the changes.
 
-To backup your data:
-
-1. Go to the backup-tab in raindrops-settings: https://app.raindrop.io/settings/backups and choose one of the options there.
+To backup your data go to the backup-tab in raindrops-settings: https://app.raindrop.io/settings/backups and choose one of the options there.
 
 ### 🧐 Generate API-Tokens
 
-This script uses the Evernote and Raindrop APIs to work, so you will need to create an API-Token for both applications. You will be asked for the tokens when you first open the app. You only need to do this once.
+This script uses the Evernote and Raindrop APIs, so you will need to create an API-Token for both applications. You will be asked for the tokens when you first open the app. You only need to do this once.
 
 #### Evernote
 
@@ -46,7 +44,7 @@ These are the general steps:
 4. Accept the terms and click "Create"
 5. Click on your newly created app, an overlay opens
 6. Click "Create test token"
-7. The combination of number and letters is the token you require. Copy it and keep it around until you are asked for it.
+7. The combination of number and letters that appears after a moment is the token. Copy it and keep it around until you are asked for it.
 
 ![Raindrop Token](./docs/rd_create_test_token.png)
 
@@ -54,8 +52,8 @@ These are the general steps:
 
 #### Binary
 
-1. For Mac a binary is provided for your convenience. You can download it [here](https://github.com/luhmann/evernote-to-raindrop-exporter/releases/download/latest/etr).
-2. Put it somewhere on your computer. Open your terminal at that location and do `./etr`.
+1. For Mac a binary is provided for your convenience. You can download it [here](https://github.com/luhmann/evernote-to-raindrop-exporter/releases/download/2.0.0/etr).
+2. Put it somewhere on your computer. Open your terminal at that location and type `./etr`.
 
 #### From Source
 
@@ -68,13 +66,15 @@ For all other platforms or if you want to compile yourself:
 
 #### Choosing Options
 
-You will be interactively asked for the developer tokens and can then make a choice about what you want to import to raindrop.io:
+You will be prompted for the developer tokens. Afterwards you can select what you want to import into raindrop.io:
 
 ![Token Entry Dialog](./docs/token-entry-dialog.png)
 
 It worked when your evernote notebooks could be successfully loaded.
 
 #### 🚨 Whats up with all the warnings?
+
+Warnings like this might appear during the import process.
 
 ![warnings](./docs/warnings.png)
 
