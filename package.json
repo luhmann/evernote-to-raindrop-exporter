@@ -1,6 +1,6 @@
 {
   "name": "evernote-to-raindrop-exporter",
-  "version": "2.0.0-beta.1",
+  "version": "2.0.0-beta.2",
   "description": "Imports links attached to evernote-notes into raindrop.io",
   "bin": {
     "evernote-to-raindrop-exporter": "dist/index.js"
