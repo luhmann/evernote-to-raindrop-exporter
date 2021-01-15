@@ -1,12 +1,11 @@
 {
   "name": "evernote-to-raindrop-exporter",
-  "version": "2.0.0-beta.1",
+  "version": "2.0.0-beta.2",
   "description": "Imports links attached to evernote-notes into raindrop.io",
   "bin": {
     "evernote-to-raindrop-exporter": "dist/index.js"
   },
   "scripts": {
-    "after:init": "npm run build",
     "build": "npm run compile && npm run pkg",
     "compile": "tsc --project 'tsconfig.json'",
     "start": "ts-node --project 'tsconfig.json' src/index.ts",
@@ -70,6 +69,9 @@
     },
     "npm": {
       "publish": false
+    },
+    "hooks": {
+      "after:bump": "npm run build"
     }
   }
 }
