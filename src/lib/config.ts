@@ -5,17 +5,19 @@ import { requestToken } from "./cli";
 let token: { [key: string]: string };
 
 export const loadToken = async () => {
-  const pathToTokenFile = path.join(__dirname, "..", "..", "token.json");
+  const pathToTokenFile = path.resolve(process.cwd(), "token.json");
   if (!fs.existsSync(pathToTokenFile)) {
     const token = await requestToken();
 
-    fs.writeFileSync(
-      pathToTokenFile,
-      JSON.stringify({
-        EVERNOTE_TOKEN: token.evernoteToken,
-        RAINDROPS_TOKEN: token.raindropToken,
-      })
-    );
+    if (token.evernoteToken && token.raindropToken) {
+      fs.writeFileSync(
+        pathToTokenFile,
+        JSON.stringify({
+          EVERNOTE_TOKEN: token.evernoteToken,
+          RAINDROPS_TOKEN: token.raindropToken,
+        })
+      );
+    }
   }
 
   const loadedToken = require(pathToTokenFile);

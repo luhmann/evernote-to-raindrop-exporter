@@ -11,7 +11,7 @@ import { Raindrop } from "./lib/raindrops-api";
 import { getEvernoteWebLink, Link } from "./lib/util";
 
 enum ImportFailureReason {
-  NO_LINK = "Note is missing URI, currently only links are supported by this script.",
+  NO_LINK = "Note has no attached URL, currently only links are supported by this script.",
 }
 
 type ImportFailure = {

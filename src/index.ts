@@ -5,22 +5,16 @@ import { config, loadToken } from "./lib/config";
 import { createEvernoteClient, TargetedNotebooks } from "./lib/evernote";
 import { log } from "./lib/logger";
 import { createRaindropClient } from "./lib/raindrops-api";
-import { server } from "./mocks/server";
 
 const configureProxy = () => {
+  log.debug("Proxying all requests through Proxyman");
   proxy.setConfig("http://localhost:9090");
   proxy.start();
-};
-
-const setupMocks = () => {
-  log.debug("Setting up mocks");
-  server.listen();
 };
 
 (async function () {
   if (config.DEBUG === true) {
     configureProxy();
-    setupMocks();
   }
 
   renderIntro();

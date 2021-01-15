@@ -106,3 +106,5 @@ dist
 token.json
 src/**/*.js
 src/**/*.js.map
+
+bin

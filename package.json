@@ -2,11 +2,20 @@
   "name": "evernote-to-raindrop-exporter",
   "version": "1.0.0",
   "description": "Imports links attached to evernote-notes into raindrop.io",
-  "main": "src/index.js",
+  "bin": "dist/index.js",
   "scripts": {
+    "build": "npm run compile && npm run pkg",
+    "compile": "tsc --project 'tsconfig.json'",
     "start": "ts-node --project 'tsconfig.json' src/index.ts",
+    "pkg": "pkg --output 'bin/etr' .",
     "test": "jest",
     "test:dev": "jest --watch"
+  },
+  "pkg": {
+    "assets": "node_modules/figlet/fonts/Standard.flf",
+    "targets": [
+      "node14-macos-x64"
+    ]
   },
   "repository": {
     "type": "git",
@@ -30,6 +39,7 @@
     "mocker-data-generator": "^2.10.0",
     "msw": "^0.25.0",
     "node-global-proxy": "^1.0.1",
+    "pkg": "^4.4.9",
     "ts-jest": "^26.4.4",
     "ts-node": "^9.1.1",
     "utility-types": "^3.10.0"
