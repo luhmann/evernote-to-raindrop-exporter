@@ -50,13 +50,6 @@ These are the general steps:
 
 ### 💯 Install and run the app
 
-#### Binary
-
-1. For Mac a binary is provided for your convenience. You can download it [here](https://github.com/luhmann/evernote-to-raindrop-exporter/releases/download/2.0.0/etr).
-2. Put it somewhere on your computer. Open your terminal at that location and type `./etr`.
-
-#### From Source
-
 For all other platforms or if you want to compile yourself:
 
 0. Make sure you have at least node >= 14
