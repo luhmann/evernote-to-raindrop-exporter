@@ -7,7 +7,7 @@ Export your [Evernote](https://evernote.com)-Notes that contain a url (usually a
 ## Highlights
 
 - Exports all of your Evernote notes or notes from only specific notebooks or notes from stack of notebooks
-- Migrates your notebook-structure to Raindrop collections
+- Migrates your notebook-structure into Raindrop collections
 - Migrates all your tags
 - Keeps the original date when your Evernote note was first created intact
 - Should work with large datasets, I used it to import 13.000 notes
@@ -50,8 +50,6 @@ These are the general steps:
 
 ### 💯 Install and run the app
 
-For all other platforms or if you want to compile yourself:
-
 0. Make sure you have at least node >= 14
 1. Clone this repository
 2. `npm install`
@@ -63,7 +61,7 @@ You will be prompted for the developer tokens. Afterwards you can select what yo
 
 ![Token Entry Dialog](./docs/token-entry-dialog.png)
 
-It worked when your evernote notebooks could be successfully loaded.
+It worked when your Evernote-Notebooks could be successfully loaded.
 
 #### 🚨 Whats up with all the warnings?
 
@@ -73,7 +71,7 @@ Warnings like this might appear during the import process.
 
 ![warnings_2](./docs/warnings_2.png)
 
-**Explanation:** It is likely that you do not only have links in the notebooks you selected. This is for example true for every note you just used to write some text down, or if you uploaded a PDF. These notes cannot be imported into Raindrop because it is not a notetaking app. Only notes that have links attached will be imported. This is most commonly true for notes that were created by using the Evernote Web Clipper.
+**Explanation:** It is likely that you do not only have links in the notebooks you selected. This is for example true for every note you just used to write some text down. These notes cannot be imported into Raindrop because it is not a notetaking app. Notes that only contain PDFs or image could theoretically be imported into Raindrop, but are not supported by this script, because it did not fit my usecase. Only notes that have links attached will be imported. This is most commonly true for notes that were created by using the Evernote Web Clipper.
 
 ### 🤕 Restore a backup
 
@@ -84,4 +82,4 @@ You can import the html-file you saved when you backed up the data at: https://a
 - Migrates only notes that have urls attached (usually created with the great Evernote Web-Clipper on Desktop or Mobile). So it is currently not possible to import urls that contain PDFs or Images, even though Raindrop would theoretically support those.
 - Will not check during import if links already exist in raindrop (but raindrop will mark them as duplicates).
 - Will not check during import if links are broken. Raindrop will mark them as broken, but if the content is not available anymore you will not have the content available there, even though you still see it in Evernote.
-- Only tested on Mac. Binary only provided on Mac (because I have no Windows or Linux Systems to test on)
+- Only tested on Mac.
