@@ -82,4 +82,4 @@ You can import the html-file you saved when you backed up the data at: https://a
 - Migrates only notes that have urls attached (usually created with the great Evernote Web-Clipper on Desktop or Mobile). So it is currently not possible to import urls that contain PDFs or Images, even though Raindrop would theoretically support those.
 - Will not check during import if links already exist in raindrop (but raindrop will mark them as duplicates).
 - Will not check during import if links are broken. Raindrop will mark them as broken, but if the content is not available anymore you will not have the content available there, even though you still see it in Evernote.
-- Only tested on Mac.
+- Only tested on Mac. Reportedly does not work out of the box in regular Windows, but seems to be fine in Windows Subsystem for Linux (WSL). [ref](https://github.com/luhmann/evernote-to-raindrop-exporter/issues/1) 
