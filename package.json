@@ -43,7 +43,7 @@
     "msw": "^0.25.0",
     "node-global-proxy": "^1.0.1",
     "pkg": "^4.4.9",
-    "release-it": "^14.2.2",
+    "release-it": "^15.6.0",
     "ts-jest": "^26.4.4",
     "ts-node": "^9.1.1",
     "utility-types": "^3.10.0"
@@ -51,7 +51,7 @@
   "dependencies": {
     "evernote": "^2.0.5",
     "figlet": "^1.5.0",
-    "got": "^11.8.1",
+    "got": "^12.5.3",
     "lodash": "^4.17.21",
     "ora": "^5.2.0",
     "prompts": "^2.4.0",
